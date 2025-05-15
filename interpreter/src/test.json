@@ -1,0 +1,170 @@
+[
+  {
+      "type": "environment",
+      "assetIdentifier": "world_settings",
+      "gravity": 9.8,
+      "sky_color": "black",
+      "ambient_light": "1.5",
+      "player_speed": 10,
+      "player_mass": 50,
+      "player_size": 1,
+      "player_jump": 0.5,
+      "player_flycontrol": false,
+      "stars": true,
+      "env_music": "",
+      "player_music": ""
+  },
+  {
+      "type": "object",
+      "assetIdentifier": "zombies 3d.glb_1709444945019",
+      "assetLink": "https://hackathon.gnfd-testnet-sp2.nodereal.io/zombies%203d.glb?Authorization=GNFD1-EDDSA%2CSignature%3D7c44c7b2d05ce3b5057db12cde31c63115f6074d05d3ebdd99e36a40a5f2532605719eb1a9368c22e5a4a70bdd5d1e412b5cd391b9db087d2b00ee2c030395b8&X-Gnfd-App-Domain=http%3A%2F%2Flocalhost%3A5173&X-Gnfd-Expiry-Timestamp=2023-09-03T09%253A23%253A39Z&X-Gnfd-User-Address=0xbe8c134357dc27E20eF665B75f465AA18411EC09&view=1",
+      "position": {
+          "x": 0.35480356621549447,
+          "y": -9.088615204108482,
+          "z": -7.378008896183968
+      },
+      "quaternion": {
+          "isQuaternion": true,
+          "_x": 0,
+          "_y": 0,
+          "_z": 0,
+          "_w": 1
+      },
+      "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+      },
+      "worldMatrix": {
+          "elements": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0.35480356621549447,
+              -9.088615204108482,
+              -7.378008896183968,
+              1
+          ]
+      },
+      "scaleFactor": 1,
+      "scaleFactorPivot": 1,
+      "fixed": true,
+      "colliders": "trimesh",
+      "OnClick": "",
+      "OnHover": "",
+      "OnCollision": ""
+  },
+  {
+      "type": "object",
+      "assetIdentifier": "Fireball_1709446609136",
+      "assetLink": "https://gnfd-testnet-sp2.nodereal.io/download/hackathon/Fireball.glb",
+      "position": {
+          "x": 35.53085288580072,
+          "y": -7.871824625591323,
+          "z": -18.34184729101924
+      },
+      "quaternion": {
+          "isQuaternion": true,
+          "_x": 0,
+          "_y": 0,
+          "_z": 0,
+          "_w": 1
+      },
+      "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+      },
+      "worldMatrix": {
+          "elements": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              35.53085288580072,
+              -7.871824625591323,
+              -18.34184729101924,
+              1
+          ]
+      },
+      "scaleFactorPivot": 100,
+      "fixed": false,
+      "colliders": "trimesh",
+      "OnClick": "",
+      "OnHover": "",
+      "OnCollision": ""
+  },
+  {
+      "type": "task",
+      "assetIdentifier": "You found the Treasure"
+  },
+  {
+      "type": "object",
+      "assetIdentifier": "Fireball_1709449094797",
+      "assetLink": "https://gnfd-testnet-sp2.nodereal.io/download/hackathon/Fireball.glb",
+      "position": {
+          "x": -25.958968988235192,
+          "y": -8.394809557375627,
+          "z": -6.097317039506633
+      },
+      "quaternion": {
+          "isQuaternion": true,
+          "_x": 0,
+          "_y": 0,
+          "_z": 0,
+          "_w": 1
+      },
+      "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+      },
+      "worldMatrix": {
+          "elements": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              -25.958968988235192,
+              -8.394809557375627,
+              -6.097317039506633,
+              1
+          ]
+      },
+      "scaleFactorPivot": 1,
+      "fixed": false,
+      "colliders": "trimesh",
+      "OnClick": "",
+      "OnHover": "",
+      "OnCollision": "Fireball found"
+  },
+  {
+      "type": "task",
+      "assetIdentifier": "Fireball found"
+  }
+]

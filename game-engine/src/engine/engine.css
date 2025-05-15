@@ -1,0 +1,19 @@
+.standard-button{
+  background-color: rgb(32,33,36) !important;
+  color: white !important;
+}
+
+.accordion-item{
+  border: none !important;
+  border-bottom: 0.5px solid #555555 !important;
+}
+
+.standard-fbutton{
+  background-color: rgb(32,33,36) !important;
+  color: white !important;
+}
+
+.standard-background{
+  background-color: #303134 !important;
+  color: white !important;
+}
