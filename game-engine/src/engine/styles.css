@@ -1,0 +1,44 @@
+@import url('https://rsms.me/inter/inter.css');
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0f544e;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Inter var', sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.label {
+  display: none;
+  background: #151520;
+  color: white;
+  padding: 6px 8px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.canvas {
+  height: 100%;
+}
+
+.panel{
+  background-color: #151520;
+  color: white;
+  padding: 10px;
+  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2);
+}
+
+.pointer       { cursor: pointer; }
+

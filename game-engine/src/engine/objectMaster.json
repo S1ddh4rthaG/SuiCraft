@@ -1,0 +1,168 @@
+[
+  {
+    "type": "environment",
+    "assetIdentifier": "world_settings",
+    "gravity": 1,
+    "sky_color": "#bde9ff",
+    "ambient_light": "2.5",
+    "player_speed": 10,
+    "player_mass": 50,
+    "player_size": 1,
+    "player_jump": 0.5,
+    "player_flycontrol": false,
+    "stars": true,
+    "env_music": "",
+    "player_music": ""
+  },
+  {
+    "type": "object",
+    "assetIdentifier": "Car",
+    "assetLink": "https://gnfd-testnet-sp2.nodereal.io/download/hackathon/NissanSkyline.glb",
+    "position": {
+      "x": 2.2120058627894332,
+      "y": 0,
+      "z": -1.3398493631747974
+    },
+    "quaternion": {
+      "isQuaternion": true,
+      "_x": 0,
+      "_y": 0,
+      "_z": 0,
+      "_w": 1
+    },
+    "scale": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "worldMatrix": {
+      "elements": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        2.2120058627894332,
+        0,
+        -1.3398493631747974,
+        1
+      ]
+    },
+    "scaleFactor": 2.5,
+    "fixed": false,
+    "colliders": "cuboid",
+    "OnClick": "",
+    "OnHover": "",
+    "OnCollision": "CheckPoint1",
+    "scaleFactorPivot": 1
+  },
+  {
+    "type": "object",
+    "assetIdentifier": "Chest",
+    "assetLink": "https://gateway.pinata.cloud/ipfs/Qmdq16KoUGqckw3dX8c9VzX4WAvkxfXasCQV8k7Zzc1rTr",
+    "position": {
+      "x": -5.488161212599283,
+      "y": 0.0002467419671588812,
+      "z": 0.9708209128973158
+    },
+    "quaternion": {
+      "isQuaternion": true,
+      "_x": 0.0007339675497236037,
+      "_y": 0,
+      "_z": 0,
+      "_w": 0.9999997306457816
+    },
+    "scale": {
+      "x": 1,
+      "y": 0.9999999999999999,
+      "z": 0.9173130185201966
+    },
+    "worldMatrix": {
+      "elements": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0.9999989225832718,
+        0.0014679347040526952,
+        0,
+        0,
+        -0.001346555614365131,
+        0.9173120301918056,
+        0,
+        -5.488161212599283,
+        0.0002467419671588812,
+        0.9708209128973158,
+        1
+      ]
+    },
+    "scaleFactor": 1,
+    "fixed": false,
+    "colliders": "hull",
+    "OnClick": "CheckPoint1",
+    "OnHover": "",
+    "OnCollision": "",
+    "scaleFactorPivot": 1.3
+  },
+  {
+    "type": "task",
+    "assetIdentifier": "CheckPoint1"
+  },
+  {
+    "type": "object",
+    "assetIdentifier": "Chest_1709101976760",
+    "assetLink": "https://gnfd-testnet-sp2.nodereal.io/download/hackathon/Chest.glb",
+    "position": {
+      "x": 6.107437137558582,
+      "y": 0,
+      "z": 8.616046585182332
+    },
+    "quaternion": {
+      "isQuaternion": true,
+      "_x": 0,
+      "_y": 0,
+      "_z": 0,
+      "_w": 1
+    },
+    "scale": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "worldMatrix": {
+      "elements": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        6.107437137558582,
+        0,
+        8.616046585182332,
+        1
+      ]
+    },
+    "scaleFactor": 0.5,
+    "fixed": false,
+    "colliders": "no",
+    "OnClick": "",
+    "OnHover": "",
+    "OnCollision": "",
+    "scaleFactorPivot": 1.7
+  }
+]
