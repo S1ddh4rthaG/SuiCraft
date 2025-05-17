@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // @ts-nocheck
 import { client, selectSp } from '@/client';
 import { getOffchainAuthKeys } from '@/utils/offchainAuth';

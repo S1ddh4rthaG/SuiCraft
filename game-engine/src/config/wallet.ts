@@ -7,7 +7,7 @@ import { publicProvider } from 'wagmi/providers/public';
 
 import { NETWORK_NAME, RPC_URL, CHAIN_ID, BLOCK_EXPLORER_URL, ICON } from './env';
 
-const SpiderChainChain: Chain = {
+const SuiChain: Chain = {
   id: CHAIN_ID,
   name: NETWORK_NAME,
   network: 'botanix',
@@ -32,7 +32,7 @@ const SpiderChainChain: Chain = {
 const { chains, publicClient, webSocketPublicClient } = configureChains(
   [
     {
-      ...SpiderChainChain,
+      ...SuiChain,
       iconUrl: ICON,
     },
     mainnet,
