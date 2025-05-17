@@ -20,7 +20,7 @@ function WalletAssetDisplay() {
         <Wallet />
       </div>
       {/* {isConnected && <AssetUploadAndFetch />} */}
-      {/* {isConnected && <WalrusAssetHandler />} */}
+      {isConnected && <WalrusAssetHandler />}
     </>
   )
 }

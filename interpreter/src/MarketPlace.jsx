@@ -157,7 +157,7 @@ const MarketPlace = () => {
     <Card sx={{ borderRadius: 0, background: "#202124", color: "white", height: "100vh" }}>
       <Card sx={{ borderRadius: 0, background: "#303134", color: "white", height: 60, padding: 2, fontSize: 20 }}>
         <b style={{ position: "absolute", left: "20px", top: "15px" }}>
-          SpiderCraft <b style={{ color: "lightgreen" }}>Store</b>{" "}
+          SuiCraft <b style={{ color: "lightgreen" }}>Store</b>{" "}
         </b>
         <Input
           style={{ position: "absolute", top: "10px", left: "160px" }}
