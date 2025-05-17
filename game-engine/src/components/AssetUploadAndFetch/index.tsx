@@ -1,19 +1,29 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // @ts-nocheck
-import { client, selectSp } from '@/client';
-import { getOffchainAuthKeys } from '@/utils/offchainAuth';
-import { useContext, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { ReedSolomon } from '@bnb-chain/reed-solomon';
-import { GlobalContext } from '../../engine/GlobalContext.jsx';
-import * as THREE from 'three'
+import { selectSp } from '@/client';
+import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import axios from 'axios';
+import { useContext, useEffect, useState } from 'react';
+import * as THREE from 'three';
+import { GlobalContext } from '../../engine/GlobalContext.jsx';
 
 const JWT = import.meta.env.VITE_PINATA_JWT;
 
 export const AssetUploadAndFetch = () => {
-  const { address, connector } = useAccount();
+  const client = useSuiClient();
+  const currentAccount = useCurrentAccount();
+
+  const [address, setAddress] = useState('');
+  useEffect(() => {
+    if (currentAccount) {
+      setAddress(currentAccount?.address);
+    }
+  }, [currentAccount]);
+
+  console.log('address', address);
+  console.log(" jwt", JWT);
+
   const [ipfsURL, setIpfsURL] = useState('');
   const [objectList, setObjectList] = useState([]);
   const [info, setInfo] = useState<{
@@ -21,7 +31,7 @@ export const AssetUploadAndFetch = () => {
     objectName: string;
     file: File | null;
   }>({
-    bucketName: 'hackathon',
+    bucketName: 'suicraft-hackathon',
     objectName: '',
     file: null,
   });
@@ -64,14 +74,13 @@ export const AssetUploadAndFetch = () => {
           </button>
         </h2>
         <div id="flush-collapseSeven" className="accordion-collapse collapse" data-bs-parent="#accordionFlushExample">
-          <div className="accordion-body">
+          <div className="accordion-body standard-background">
             <div className='row m-0 p-0 mb-2'>
-
-              <div className='box shadow-sm border border-success'>
-                <div className="field is-horizontal">
+              <div className='box shadow-sm border-0 standard-background'>
+                <div className="field is-horizontal align-items-center justify-content-between">
                   <div className="file w-100">
                     <label className="file-label">
-                      <input className="file-input w-100" type="file" name="resume" onChange={(e) => {
+                      <input className="file-input" type="file" name="resume" onChange={(e) => {
                         if (e.target.files) {
                           setInfo({
                             ...info,
@@ -91,7 +100,7 @@ export const AssetUploadAndFetch = () => {
                     </label>
                   </div>
                   <button
-                    className="button is-primary me-1"
+                    className="standard-button is-primary m-1 p-2"
                     onClick={async () => {
                       if (!address || !info.file) return;
 
@@ -152,11 +161,9 @@ export const AssetUploadAndFetch = () => {
 
                 {/* create object */}
                 <div className="field d-flex justify-content-between">
-
-
                   <button
                     disabled={txnHash === ''}
-                    className="button is-primary me-1"
+                    className="standard-button is-primary me-1"
                     onClick={async () => {
                       if (!address || !info.file || !ipfsURL) return;
 
@@ -179,7 +186,7 @@ export const AssetUploadAndFetch = () => {
                     Add to Scene
                   </button>
                   <button
-                    className="button is-primary"
+                    className="standard-button is-primary"
                     onClick={fetchAssets}
                   >
                     My Assets
