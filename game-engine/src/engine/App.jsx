@@ -174,34 +174,9 @@ function Scene() {
   };
 
   // Publish Game
-  const publishGame = async (e) => {
+  const publishGame = async () => {
     try {
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-      setAccount(accounts[0]);
-
-      await ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: networkMap.BOTANIX_TESTNET.chainId }],
-      });
-
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      setSigner(signer);
-
-      window.ethereum.on("accountsChanged", async function (accounts) {
-        setAccount(accounts[0]);
-        await publishGame();
-      });
-
-      const factoryContract_ = new ethers.Contract(
-        ContractAddress.GameFactory,
-        GameFactory.abi,
-        signer
-      );
-      setFactoryContract(factoryContract_);
-
+      // Prompt for game details
       const { value: gameName } = await Swal.fire({
         title: "Enter Game Name",
         input: "text",
@@ -215,130 +190,73 @@ function Scene() {
         },
       });
 
-      if (gameName) {
-        const { value: gamePrice } = await Swal.fire({
-          title: "Enter Game Price",
-          input: "number",
-          inputLabel: "Game Price",
-          inputPlaceholder: "Enter the price of your game",
-          inputAttributes: {
-            min: 0,
-          },
-          showCancelButton: true,
-          inputValidator: (value) => {
-            if (!value) {
-              return "You need to enter a game price!";
-            }
-          },
-        });
+      if (!gameName) return;
 
-        if (gamePrice) {
-          const { value: gameThumbnail } = await Swal.fire({
-            title: "Enter Game Thumbnail",
-            input: "text",
-            inputLabel: "Game Thumbnail",
-            inputPlaceholder: "Enter the thumbnail link of your game",
-            showCancelButton: true,
-            inputValidator: (value) => {
-              if (!value) {
-                return "You need to enter a game thumbnail!";
-              }
-            },
-          });
+      const { value: gamePrice } = await Swal.fire({
+        title: "Enter Game Price",
+        input: "number",
+        inputLabel: "Game Price",
+        inputPlaceholder: "Enter the price of your game",
+        inputAttributes: { min: 0 },
+        showCancelButton: true,
+        inputValidator: (value) => {
+          if (!value) {
+            return "You need to enter a game price!";
+          }
+        },
+      });
 
-          const getLink = async (e) => {
-            try {
-              const file = new Blob([JSON.stringify(objectMaster)], {
-                type: "application/json",
-              });
-              const formData = new FormData();
-              formData.append("file", file);
+      if (!gamePrice) return;
 
-              const pinataMetadata = JSON.stringify({
-                name: `final_json_${Date.now()}.json`,
-              });
-              formData.append("pinataMetadata", pinataMetadata);
+      const { value: gameThumbnail } = await Swal.fire({
+        title: "Enter Game Thumbnail",
+        input: "text",
+        inputLabel: "Game Thumbnail",
+        inputPlaceholder: "Enter the thumbnail link of your game",
+        showCancelButton: true,
+        inputValidator: (value) => {
+          if (!value) {
+            return "You need to enter a game thumbnail!";
+          }
+        },
+      });
 
-              const pinataOptions = JSON.stringify({
-                cidVersion: 0,
-              });
-              formData.append("pinataOptions", pinataOptions);
+      if (!gameThumbnail) return;
 
-              const JWT = import.meta.env.VITE_PINATA_JWT;
+      // Upload scene JSON to Tusky
+      const tusky = new (await import('@tusky-io/ts-sdk/web')).Tusky({ apiKey: import.meta.env.VITE_TUSKY_API_KEY });
+      const vaultName = 'sui-craft-vault';
+      let vaults = await tusky.vault.listAll();
+      let vault = vaults.find(v => v.name === vaultName);
+      if (!vault) vault = await tusky.vault.create(vaultName, { encrypted: false });
+      const sceneBlob = new Blob([JSON.stringify(objectMaster)], { type: 'application/json' });
+      const tuskyFileId = await tusky.file.upload(vault.id, sceneBlob);
+      const tuskySceneUrl = `https://api.tusky.io/files/${tuskyFileId}/data`;
 
-              const res = await axios.post(
-                "https://api.pinata.cloud/pinning/pinFileToIPFS",
-                formData,
-                {
-                  maxBodyLength: "Infinity",
-                  headers: {
-                    "Content-Type": `multipart/form-data; boundary=${formData._boundary}`,
-                    Authorization: `Bearer ${JWT}`,
-                  },
-                }
-              );
+      // Prepare tasks
+      const tasks = objectMaster.filter((object) => object.type === "task");
+      let taskNames = tasks.map((task) => task.assetIdentifier);
+      console.log("taskNames:", taskNames);
 
-              if (res.data && res.data.IpfsHash) {
-                // console.log(
-                //   `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`
-                // );
-                return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
-              } else {
-                console.error("Failed to get IPFS link");
-              }
-            } catch (error) {
-              console.error(
-                "Error uploading json while publishing game:",
-                error
-              );
-            }
-          };
-
-          const tasks = objectMaster.filter((object) => object.type === "task");
-
-          let taskNames = [];
-
-          tasks.map((task) => {
-            taskNames.push(task.assetIdentifier);
-          });
-
-          console.log("taskNames:", taskNames);
-
-          const tx = await factoryContract_.createGame(
-            gameName,
-            getLink(),
-            gamePrice,
-            gameThumbnail,
-            taskNames
-          );
-          await tx.wait();
-
-          const gameContractAddress = await factoryContract_.getGameAddresses();
-          setGameAddress(gameContractAddress[gameContractAddress.length - 1]);
-
-          Swal.fire({
-            title: "Game Published!",
-            text: `Game Address: ${
-              gameContractAddress[gameContractAddress.length - 1]
-            }`,
-            icon: "success",
-            confirmButtonText: "Open Game",
-          }).then((result) => {
-            if (result.isConfirmed) {
-              let absoluteURL = new URL(
-                "https://bnb-craft-playground.vercel.app/"
-              );
-              absoluteURL.searchParams.append(
-                "game",
-                gameContractAddress[gameContractAddress.length - 1]
-              );
-              window.open(absoluteURL.href, "_blank");
-            }
-          });
-        }
-      }
+      // @Siddhartha: Call Sui contract 
+      
+      // const client = useSuiClient();
+      // await client.callMoveFunction({ ... });
+      // For now, I'm showing a success dialog with the Tusky URL
+      Swal.fire({
+        title: "Game Published!",
+        html: `<div>Scene uploaded to Tusky:<br/><a href='${tuskySceneUrl}' target='_blank'>${tuskySceneUrl}</a></div>` +
+          `<div class='mt-2'>Game Name: <b>${gameName}</b><br/>Price: <b>${gamePrice}</b><br/>Thumbnail: <b>${gameThumbnail}</b></div>`,
+        icon: "success",
+        confirmButtonText: "OK",
+      });
     } catch (error) {
-      console.error("Error in web3Handler:", error);
+      console.error("Error in publishGame:", error);
+      Swal.fire({
+        title: "Error",
+        text: error.message || "Failed to publish game.",
+        icon: "error",
+      });
     }
   };
 
@@ -535,15 +453,15 @@ function Scene() {
             </div>
             <div className="row m-0 p-0">
               {assetMaster.map((object, index) => {
-                // Defensive: handle both Pinata and Tusky asset formats
+                
                 let objectName = object.metadata?.name || object.name || object.id || "";
                 let objectNameWithoutTimeStamp = objectName.split("_")[0];
                 // Only show .glb files
                 if (objectNameWithoutTimeStamp.split(".").pop() !== "glb") return;
-                // Pinata asset: has ipfs_pin_hash
+                
                 let url = object.ipfs_pin_hash
                   ? `https://gateway.pinata.cloud/ipfs/${object.ipfs_pin_hash}`
-                  : object.link || object.assetLink || "";
+                  : object.link || object.assetLink || (object.id ? `https://api.tusky.io/files/${object.id}/data` : "");
                 if (!url) return;
                 return (
                   <div
@@ -561,7 +479,7 @@ function Scene() {
                         </a>
                         <button
                           className="btn btn-primary"
-                          onClick={(e) => {
+                          onClick={() => {
                             navigator.clipboard.writeText(url);
                             dispatch({
                               type: "ADD_OBJECT",
