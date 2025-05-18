@@ -1,329 +1,236 @@
-import { Canvas, useFrame } from "@react-three/fiber"
-import { Loader, PointerLockControls, KeyboardControls, Cylinder, Box, Stars } from "@react-three/drei"
-import { Debug, Physics, RigidBody, CapsuleCollider } from "@react-three/rapier"
-import { Player } from "./Player"
-// import { Model } from "./Show2"
-import { Suspense, useEffect } from "react"
-import { utils } from "ethers"
-import { useState } from "react"
-import { ethers } from "ethers"
+import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Loader, PointerLockControls, KeyboardControls, Cylinder, Box, Stars } from "@react-three/drei";
+import { Debug, Physics, RigidBody, CapsuleCollider  } from "@react-three/rapier";
+import { Player } from "./Player";
+import { Suspense, useEffect, useState, useRef } from "react";
+import { utils, ethers } from "ethers";
 import PlayerStatus from "./contracts/PlayerStatus.json"
 import GameAbi from "./contracts/Game.json"
 import { useSharedState } from "./sharedState"
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader"
-import { useLoader } from "@react-three/fiber"
-import { BigNumber } from "ethers"
-import { useRef } from "react"
-import data from "./test.json"
-import { Scene } from "three"
-import Swal from "sweetalert2"
-import GameFactoryMarketplace from "./GameFactoryMarketplace"
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import Swal from "sweetalert2";
 
-import { ConnectButton } from "@mysten/dapp-kit"
-import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit"
-import { Transaction } from "@mysten/sui/transactions"
-import { useNetworkVariable } from "./networkConfig.js"
-import { GAME_FACTORY } from "./constants.js"
+import GameFactoryMarketplace from "./GameFactoryMarketplace";
+import { ConnectButton } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { Transaction } from "@mysten/sui/transactions";
+import { useNetworkVariable } from "./networkConfig.js";
+import { GAME_FACTORY } from "./constants.js";
 
-const networkMap = {
-  BOTANIX_TESTNET: {
-    chainId: utils.hexValue(3636), // '0xe2c'
-    chainName: "Botanix Testnet",
-    nativeCurrency: { name: "BTC", symbol: "BTC", decimals: 18 },
-    rpcUrls: ["https://node.botanixlabs.dev"],
-    blockExplorerUrls: ["https://blockscout.botanixlabs.dev/"],
-  },
+
+const VITE_TUSKY_API_KEY = "5902acd4-38ee-410a-a23e-1674d025bec5";
+
+// Custom hook to fetch & parse GLTF from a remote URL
+function useGLTFFromUrl(url) {
+  const [gltf, setGltf] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchAndParse() {
+      try {
+        const resp = await fetch(url, {
+          headers: { "Api-Key": VITE_TUSKY_API_KEY },
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const arrayBuffer = await resp.arrayBuffer();
+        const loader = new GLTFLoader();
+        loader.parse(arrayBuffer, "", (parsed) => {
+          if (!cancelled) setGltf(parsed);
+        });
+      } catch (e) {
+        console.error("Failed to load model:", e);
+      }
+    }
+    fetchAndParse();
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return gltf;
 }
 
-// Controls: WASD + left click
+function Model({ file, object }) {
+  const gltf = useGLTFFromUrl(file);
+  const blobUrlRef = useRef(null);
 
-const Model = async ({ file, object }) => {
-  console.log("Model file: ", file)
-  console.log("Model object: ", object)
-  const VITE_TUSKY_API_KEY = ""
-  const resp = await fetch(file, {
-    headers: { "Api-Key": VITE_TUSKY_API_KEY },
-  })
-  if (!resp.ok) throw new Error("HTTP error " + resp.status)
-  const contentLength = resp.headers.get("Content-Length")
-  const total = contentLength ? parseInt(contentLength, 10) : 0
-  const reader = resp.body.getReader()
-  let received = 0
-  const chunks = []
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    chunks.push(value)
-    received += value.length
-  }
-  const blob = new Blob(chunks)
-  const gltf = useLoader(GLTFLoader, blob, (loader) => {
-    console.log("loaded model", object.assetIdentifier)
-  })
+  // Create & revoke blob URL if needed
+  useEffect(() => {
+    if (gltf) {
+      // nothing to do here if parsing directly
+      return;
+    }
+  }, [gltf]);
 
+  if (!gltf) return null;
+
+  const { scale, position, assetIdentifier } = object;
   return (
     <primitive
-      key={object.assetIdentifier}
+      key={assetIdentifier}
       object={gltf.scene.clone()}
-      scale={[object.scale.x * object.scaleFactor, object.scale.y * object.scaleFactor, object.scale.z * object.scaleFactor]}
-      position={[object.position.x, object.position.y, object.position.z]}
+      scale={[scale.x, scale.y, scale.z]}
+      position={[position.x, position.y, position.z]}
     />
-  )
+  );
 }
 
 export default function App() {
-  const queryParams = new URLSearchParams(window.location.search)
-  const gameAddress = queryParams.get("game") || "loading..."
-  const testmode = queryParams.get("testmode") || false
+  const queryParams = new URLSearchParams(window.location.search);
+  const gameAddress = queryParams.get("game") || null;
+  const testmode = queryParams.get("testmode") === "true";
+  const client = useSuiClient();
+  const { setText } = useSharedState();
 
-  const client = useSuiClient()
+  const [worldSettings, setWorldSettings] = useState(null);
+  const [lights, setLights] = useState([]);
+  const [objects, setObjects] = useState([]);
+  const [gameReady, setGameReady] = useState(false);
+  const [playerContract, setPlayerContract] = useState(null);
+  const [data, setData] = useState(null);
 
-  const [account, setAccount] = useState(null)
-  const { user, setUser, setText } = useSharedState()
-  const [playerContract, setPlayerContract] = useState(null)
-  const [gameContract, setGameContract] = useState(null)
-  let [objects, setObjects] = useState([])
-  const [world_settings, setWorldSettings] = useState({})
-  const [light, setLight] = useState([])
-  const [gameReady, setGameReady] = useState(false)
-  const [data, setData] = useState()
+  // Parse the JSON payload into our React state
+  const load = (json) => {
+    const env = json.find((o) => o.type === "environment") || {};
+    const lightObjs = json.filter((o) => o.type === "light");
+    const objList = json.filter((o) => o.type === "object");
 
-  // takes whole JSON data and classifies it into world settings, light, and objects
-  const load = (data) => {
-    // console.log("loading data", data)
-    setWorldSettings({})
-    setObjects([])
-    setLight([])
-    const song = new Audio(world_settings.env_music)
-    // song.play()
-    data.map((object) => {
-      if (object.type === "environment") {
-        // console.log("setting world settings")
-        setWorldSettings(object)
-      } else if (object.type === "light") {
-        // console.log("setting light")
-        light.push(object)
-      } else if (object.type === "object" && objects.includes(object) === false) {
-        // console.log("setting object", object)
-        setObjects((objects) => [...objects, object])
-      }
-    })
+    setWorldSettings(env);
+    setLights(lightObjs);
+    setObjects(objList);
+    setGameReady(true);
+  };
 
-    console.log("World Settings: ", world_settings)
-    console.log("Light: ", light)
-    console.log("Objects: ", objects)
-    setGameReady(true)
-  }
-
-  // to display "You Won" or "Welcome to the game" when the game starts or ends
-  const menu = async (isStart, playerContract, data) => {
-    const message = !isStart ? "You Won" : "Welcome to the game"
+  // Show start/end menu
+  const menu = (isStart) => {
     Swal.fire({
       title: "Menu",
-      text: message,
+      text: isStart ? "Welcome to the game" : "You Won",
       icon: "success",
       confirmButtonText: "New Game",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        if (playerContract) {
-          await playerContract.reset().then((tx) => {
-            // console.log("Reseting PlayerContract data ", tx)
-            load(data)
-          })
-        } else {
-          console.log(playerContract)
-          console.log("no contract")
-        }
+    }).then((result) => {
+      if (result.isConfirmed && playerContract) {
+        playerContract.reset().then(() => load(data));
       }
-    })
-  }
+    });
+  };
 
-  // to buy the game
-  const buy = async (game_contract, price) => {
-    await game_contract.name().then((name) => {
-      Swal.fire({
-        title: name,
-        text: "Please buy the game to continue",
-        icon: "info",
-        confirmButtonText: price + " BTC",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          //TODO Buy the game.
-          game_contract.buyGame({ value: price }).then((tx) => {
-            console.log("Bought game ", tx)
-          })
-        }
-      })
-    })
-  }
-
-  // load the GameContract
+  // Load the on-chain Game configuration and JSON
   const loadGame = async () => {
+    if (!gameAddress) return;
     try {
       const res = await client.getObject({
         id: gameAddress,
-        options: { showType: true, showContent: true },
-      })
-
-      const fields = res.data.content.fields
-      // get API key from env
-      const VITE_TUSKY_API_KEY = ""
-      const response = await fetch(fields.configuration, {
+        options: { showContent: true },
+      });
+      const configUrl = res.data.content.fields.configuration;
+      const resp = await fetch(configUrl, {
         headers: { "Api-Key": VITE_TUSKY_API_KEY },
-      })
+      });
+      const gameData = await resp.json();
+      setData(gameData);
+      load(gameData);
 
-      const gameData = await response.json()
-      setData(gameData)
-      load(gameData)
-
-      console.log("Game Data:", gameData)
-      console.log("Game Object:", res, fields)
-
-      //TODO: Check if the game is already bought or not
-      // // check if player owns the game or not
-      // await Gamecontract.getPlayerContract().then((address) => {
-      //   if (address === "0x0000000000000000000000000000000000000000") {
-      //     Gamecontract.price().then((price) => {
-      //       // display the buy screen
-      //       buy(Gamecontract, price)
-      //     })
-      //   } else {
-      //     // player owns the game : load the player contract
-      //     const cur_playerContract = new ethers.Contract(address, PlayerStatus.abi, signer)
-      //     console.log("Player Contract : ", cur_playerContract)
-      //     setPlayerContract(cur_playerContract) // changed playerContract state
-      //     menu(true, cur_playerContract, cur_data)
-      //   }
-      // })
-    } catch (error) {
-      console.error("Error loading contracts:", error)
+      // TODO: check ownership and set playerContract,
+      // then: menu(true)
+    } catch (e) {
+      console.error("Error loading game:", e);
     }
-  }
+  };
 
-  // test screen shown if testmode is true
-  const test = async () => {
+  // If in test mode, prompt user to paste JSON
+  const promptTestJson = async () => {
     const { value: text } = await Swal.fire({
-      title: "Test Mode",
+      title: "Test Mode JSON",
       input: "textarea",
-      inputLabel: "Import JSON",
-      inputPlaceholder: "Paste the JSON here",
-    })
+      inputPlaceholder: "Paste JSON here",
+    });
     if (text) {
-      setData(JSON.parse(text))
-      load(JSON.parse(text))
+      const parsed = JSON.parse(text);
+      setData(parsed);
+      load(parsed);
     }
+  };
+
+  // Kick things off
+  useEffect(() => {
+    if (testmode) {
+      promptTestJson();
+    } else {
+      loadGame();
+    }
+  }, []);
+
+  if (!gameAddress) {
+    return <GameFactoryMarketplace />;
   }
 
-  useEffect(() => {
-    if (testmode) test()
-    else
-      loadGame().then(() => {
-        setGameReady(true)
-      })
-  }, [])
+  if (!gameReady || !worldSettings) {
+    return <Loader />;
+  }
 
-  useEffect(() => {
-    if (data) {
-      load(data)
-    }
-  }, [data])
+  return (
+    <KeyboardControls
+      map={[
+        { name: "forward", keys: ["w", "W", "ArrowUp"] },
+        { name: "backward", keys: ["s", "S", "ArrowDown"] },
+        { name: "left", keys: ["a", "A", "ArrowLeft"] },
+        { name: "right", keys: ["d", "D", "ArrowRight"] },
+        { name: "jump", keys: ["Space"] },
+      ]}
+    >
+      <Suspense fallback={null}>
+        <Canvas camera={{ fov: 45 }} shadows>
+          <color attach="background" args={[worldSettings.sky_color]} />
+          {worldSettings.stars && <Stars depth={100} />}
+          <ambientLight intensity={worldSettings.ambient_light} />
+          {lights.map((l) => (
+            <pointLight
+              key={l.assetIdentifier}
+              position={[l.position.x, l.position.y, l.position.z]}
+              intensity={l.intensity}
+              color={l.color}
+            />
+          ))}
 
-  if (gameAddress === "loading...") return <GameFactoryMarketplace />
-  else
-    return (
-      <>
-        {gameReady ? (
-          <KeyboardControls
-            map={[
-              { name: "forward", keys: ["ArrowUp", "w", "W"] },
-              { name: "backward", keys: ["ArrowDown", "s", "S"] },
-              { name: "left", keys: ["ArrowLeft", "a", "A"] },
-              { name: "right", keys: ["ArrowRight", "d", "D"] },
-              { name: "jump", keys: ["Space"] },
-            ]}>
-            <Suspense>
-              <Canvas camera={{ fov: 45 }} shadows>
-                <Stars />
-                <ambientLight intensity={world_settings.ambient_light} />
-                <color attach="background" args={[world_settings.sky_color]} />
-                {world_settings.stars && <Stars depth={100} />}
-                {light &&
-                  light.map((light) => {
-                    return (
-                      <pointLight
-                        key={light.assetIdentifier}
-                        position={[light.position.x, light.position.y, light.position.z]}
-                        intensity={light.intensity}
-                        color={light.color}
-                      />
-                    )
-                  })}
-                <Physics gravity={[0, -world_settings.gravity, 0]}>
-                  {/* <Debug /> */}
-                  {objects &&
-                    objects.map((object) => {
-                      console.log("Body, object: ", object)
-                      if (object.colliders !== "no") {
-                        return (
-                          <RigidBody
-                            onPointerEnter={() => {
-                              setText(object.onHover)
-                            }}
-                            onPointerLeave={() => {
-                              setText("")
-                            }}
-                            onClick={async () => {
-                              if (object.OnClick != "")
-                                // TODO: Update the player contract to complete the task
-                                await playerContract.completeTask(object.OnClick).then((tx) => {
-                                  console.log("1 task completed ", tx)
-                                  if (tx) {
-                                    menu(false, playerContract)
-                                  }
-                                })
-                            }}
-                            // onCollisionEnter={async () => {
-                            //   if (object.OnCollision != "") await playerContract.completeTask((object.onCollision))
-                            // }}
-                            // onIntersectionEnter={async () => {
-                            //   if (object.onSensorEnter != "") await playerContract.completeTask((object.onSensorEnter))
-                            // }}
-                            // onIntersectionExit={async () => {
-                            //   if (object.onSensorExit != "") await playerContract.completeTask((object.onSensorExit))
-                            // }}
-                            sensor={object.sensor}
-                            key={object.assetIdentifier}
-                            type={object.fixed ? "fixed" : "dynamic"}
-                            colliders={object.colliders}
-                            mass={1}>
-                            {console.log("colliders:(2) ", object)}
-                            <Model key={object.assetIdentifier} object={object} file={object.assetLink} />
-                          </RigidBody>
-                        )
-                      } else {
-                        {
-                          console.log("colliders: ", object)
-                        }
-                        return <Model key={object.assetIdentifier} object={object} file={object.assetLink} />
-                      }
-                    })}
-                  <Player
-                    speed={world_settings.player_speed}
-                    mass={world_settings.player_mass}
-                    jump={world_settings.player_jump}
-                    size={world_settings.player_size}
-                    flycontrol={world_settings.flycontrol}
-                    music={world_settings.player_music}
-                  />
-                </Physics>
+          <Physics gravity={[0, -worldSettings.gravity, 0]}>
+            {objects.map((obj) =>
+              obj.colliders !== "no" ? (
+                <RigidBody
+                  key={obj.assetIdentifier}
+                  type={obj.fixed ? "fixed" : "dynamic"}
+                  colliders={obj.colliders}
+                  sensor={obj.sensor}
+                  onPointerEnter={() => setText(obj.onHover)}
+                  onPointerLeave={() => setText("")}
+                  onClick={async () => {
+                    if (obj.OnClick && playerContract) {
+                      const tx = await playerContract.completeTask(obj.OnClick);
+                      if (tx) menu(false);
+                    }
+                  }}
+                >
+                  <Model file={obj.assetLink} object={obj} />
+                </RigidBody>
+              ) : (
+                <Model key={obj.assetIdentifier} file={obj.assetLink} object={obj} />
+              )
+            )}
 
-                <PointerLockControls />
-              </Canvas>
-            </Suspense>
-          </KeyboardControls>
-        ) : (
-          <Loader />
-        )}
-      </>
-    )
+            {/* Your Player component */}
+            <Player
+              speed={worldSettings.player_speed}
+              mass={worldSettings.player_mass}
+              jump={worldSettings.player_jump}
+              size={worldSettings.player_size}
+              flycontrol={worldSettings.flycontrol}
+              music={worldSettings.player_music}
+            />
+          </Physics>
+
+          <PointerLockControls />
+        </Canvas>
+      </Suspense>
+    </KeyboardControls>
+  );
 }
