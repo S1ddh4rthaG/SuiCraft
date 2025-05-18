@@ -148,6 +148,7 @@ export default function App() {
         confirmButtonText: price + " BTC",
       }).then((result) => {
         if (result.isConfirmed) {
+          //TODO Buy the game.
           game_contract.buyGame({ value: price }).then((tx) => {
             console.log("Bought game ", tx)
           })
@@ -178,6 +179,7 @@ export default function App() {
       console.log("Game Data:", gameData)
       console.log("Game Object:", res, fields)
 
+      //TODO: Check if the game is already bought or not
       // // check if player owns the game or not
       // await Gamecontract.getPlayerContract().then((address) => {
       //   if (address === "0x0000000000000000000000000000000000000000") {
@@ -272,6 +274,7 @@ export default function App() {
                             }}
                             onClick={async () => {
                               if (object.OnClick != "")
+                                // TODO: Update the player contract to complete the task
                                 await playerContract.completeTask(object.OnClick).then((tx) => {
                                   console.log("1 task completed ", tx)
                                   if (tx) {
