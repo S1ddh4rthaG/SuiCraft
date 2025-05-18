@@ -11,15 +11,15 @@ import { Transaction } from "@mysten/sui/transactions"
 import { useNetworkVariable } from "./networkConfig.js"
 import { GAME_FACTORY } from "./constants.js"
 
-const networkMap = {
-  BOTANIX_TESTNET: {
-    chainId: utils.hexValue(3636),
-    chainName: "Botanix Testnet",
-    nativeCurrency: { name: "BTC", symbol: "BTC", decimals: 18 },
-    rpcUrls: ["https://node.botanixlabs.dev"],
-    blockExplorerUrls: ["https://blockscout.botanixlabs.dev/"],
-  },
-}
+// const networkMap = {
+//   BOTANIX_TESTNET: {
+//     chainId: utils.hexValue(3636),
+//     chainName: "Botanix Testnet",
+//     nativeCurrency: { name: "BTC", symbol: "BTC", decimals: 18 },
+//     rpcUrls: ["https://node.botanixlabs.dev"],
+//     blockExplorerUrls: ["https://blockscout.botanixlabs.dev/"],
+//   },
+// }
 
 const GameFactoryMarketplace = () => {
   const darkTheme = createTheme({
