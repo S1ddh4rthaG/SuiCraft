@@ -3,12 +3,13 @@
 // @ts-nocheck
 import { selectSp } from '@/client';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
-import axios from 'axios';
+import { Tusky } from '@tusky-io/ts-sdk/web';
 import { useContext, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { GlobalContext } from '../../engine/GlobalContext.jsx';
 
-const JWT = import.meta.env.VITE_PINATA_JWT;
+// Initialize Tusky client
+const tusky = new Tusky({ apiKey: import.meta.env.VITE_TUSKY_API_KEY });
 
 export const AssetUploadAndFetch = () => {
   const client = useSuiClient();
@@ -16,50 +17,110 @@ export const AssetUploadAndFetch = () => {
 
   const [address, setAddress] = useState('');
   useEffect(() => {
-    if (currentAccount) {
-      setAddress(currentAccount?.address);
-    }
+    if (currentAccount) setAddress(currentAccount.address);
   }, [currentAccount]);
 
-  console.log('address', address);
-  console.log(" jwt", JWT);
-
-  const [ipfsURL, setIpfsURL] = useState('');
+  const [fileId, setFileId] = useState('');
+  const [fileURL, setFileURL] = useState('');
   const [objectList, setObjectList] = useState([]);
-  const [info, setInfo] = useState<{
-    bucketName: string;
-    objectName: string;
-    file: File | null;
-  }>({
-    bucketName: 'suicraft-hackathon',
-    objectName: '',
-    file: null,
-  });
+  const [info, setInfo] = useState({ objectName: '', file: null });
+  // const { dispatch } = useContext(GlobalContext);
+
   const [txnHash, setTxnHash] = useState('');
   const { state, dispatch } = useContext(GlobalContext);
   const { assetMaster } = state
 
-  const fetchAssets = async () => {
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Upload GLB to Tusky vault
+  const handleTuskyUpload = async () => {
+    if (!address || !info.file) return;
+    setIsUploading(true);
     try {
-      const res = await fetch("https://api.pinata.cloud/data/pinList?status=pinned", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${JWT}`,
-        },
+      const vaultName = 'sui-craft-vault';
+      const vaults = await tusky.vault.listAll();
+      let vault = vaults.find(v => v.name === vaultName);
+      if (!vault) vault = await tusky.vault.create(vaultName, { encrypted: false });
+
+      const uploadedId = await tusky.file.upload(vault.id, info.file);
+      setFileId(uploadedId);
+      alert('Upload to Tusky successful');
+      // Immediately add to scene after upload
+      const resp = await fetch(
+        `https://api.tusky.io/files/${uploadedId}/data`,
+        { headers: { 'Api-Key': import.meta.env.VITE_TUSKY_API_KEY } }
+      );
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      dispatch({
+        type: 'ADD_OBJECT',
+        payload: {
+          link: url,
+          assetIdentifier: `${uploadedId}_${Date.now()}`,
+          assetLink: url,
+          position: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion(0, 0, 0, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+          worldMatrix: new THREE.Matrix4(),
+          collision: 'no',
+          fixed: false,
+        }
       });
-      const resData = await res.json();
-      console.log(resData);
-      if (resData?.rows) {
-        setObjectList(resData?.rows);
-        dispatch({
-          type: "SET_ASSETS",
-          payload: {
-            assetMaster: resData?.rows
-          }
-        })
-      }
     } catch (error) {
-      console.log(error);
+      console.error('Tusky upload error:', error);
+      alert('Tusky upload failed');
+    }
+    setIsUploading(false);
+  };
+
+  // Download a specific Tusky file as blob and dispatch into scene
+  const handleTuskyDownload = async (id) => {
+    try {
+      const resp = await fetch(
+        `https://api.tusky.io/files/${id}/data`,
+        { headers: { 'Api-Key': import.meta.env.VITE_TUSKY_API_KEY } }
+      );
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      dispatch({
+        type: 'ADD_OBJECT',
+        payload: {
+          link: url,
+          assetIdentifier: `${id}_${Date.now()}`,
+          assetLink: url,
+          position: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion(0, 0, 0, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+          worldMatrix: new THREE.Matrix4(),
+          collision: 'no',
+          fixed: false,
+        }
+      });
+    } catch (error) {
+      console.error('Tusky download error:', error);
+      alert('Download failed');
+    }
+  };
+
+  // List files in Tusky vault
+  const fetchTuskyAssets = async () => {
+    try {
+      const vaultName = 'sui-craft-vault';
+      const vaults = await tusky.vault.listAll();
+      const vault = vaults.find(v => v.name === vaultName);
+      console.log('Tusky vault:', vault);
+      if (!vault) return;
+      const files = await tusky.file.list(vault.id);
+      console.log('Tusky files:', files);
+      const assets = files.items.map(f => ({ id: f.id, name: f.name || f.id }));
+      console.log('Tusky assets:', assets);
+      setObjectList(assets);
+
+      dispatch({ type: 'SET_ASSETS', payload: { assetMaster: assets } });
+    } catch (error) {
+      console.error('Tusky fetch error:', error);
     }
   };
 
@@ -67,132 +128,48 @@ export const AssetUploadAndFetch = () => {
     <>
       <div className="accordion-item standard-fbutton">
         <h2 className="accordion-header">
-          <button className="accordion-button standard-background collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapseSeven" aria-expanded="false" aria-controls="flush-collapseSeven">
-            <span className="me-2 align-middle bi bi-bucket-fill text-success"></span>
-
-            Game Assets
+          <button className="accordion-button standard-background collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assetCollapse" aria-expanded="false">
+            <span className="me-2 align-middle bi bi-bucket-fill text-success" /> Game Assets
           </button>
         </h2>
-        <div id="flush-collapseSeven" className="accordion-collapse collapse" data-bs-parent="#accordionFlushExample">
+        <div id="assetCollapse" className="accordion-collapse collapse" data-bs-parent="#accordionFlushExample">
           <div className="accordion-body standard-background">
-            <div className='row m-0 p-0 mb-2'>
-              <div className='box shadow-sm border-0 standard-background'>
+            <div className="row m-0 p-0 mb-2">
+              <div className="box shadow-sm border-0 standard-background">
                 <div className="field is-horizontal align-items-center justify-content-between">
                   <div className="file w-100">
                     <label className="file-label">
-                      <input className="file-input" type="file" name="resume" onChange={(e) => {
-                        if (e.target.files) {
-                          setInfo({
-                            ...info,
-                            file: e.target.files[0],
-                            objectName: e.target.files[0].name
-                          })
-                        }
+                      <input className="file-input" type="file" accept=".glb" onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) setInfo({ objectName: file.name, file });
                       }} />
-                      <span className="file-cta">
-                        <span className="file-icon">
-                          <i className="fas fa-upload"></i>
-                        </span>
-                        <span className="file-label">
-                          Choose a GLB model
-                        </span>
-                      </span>
+                      <span className="file-cta"><span className="file-icon"><i className="fas fa-upload" /></span><span className="file-label">Choose a GLB model</span></span>
                     </label>
                   </div>
-                  <button
-                    className="standard-button is-primary m-1 p-2"
-                    onClick={async () => {
-                      if (!address || !info.file) return;
-
-                      const spInfo = await selectSp();
-                      // console.log('spInfo', spInfo);
-
-                      try {
-                        const file = new Blob([info.file], {
-                          type: "application/json",
-                        });
-                        const formData = new FormData();
-                        formData.append("file", file);
-
-                        const pinataMetadata = JSON.stringify({
-                          name: `${info.objectName}_${Date.now()}`,
-                        });
-                        formData.append("pinataMetadata", pinataMetadata);
-
-                        const pinataOptions = JSON.stringify({
-                          cidVersion: 0,
-                        });
-                        formData.append("pinataOptions", pinataOptions);
-
-                        const res = await axios.post(
-                          "https://api.pinata.cloud/pinning/pinFileToIPFS",
-                          formData,
-                          {
-                            maxBodyLength: "Infinity",
-                            headers: {
-                              "Content-Type": `multipart/form-data; boundary=${formData._boundary}`,
-                              Authorization: `Bearer ${JWT}`,
-                            },
-                          }
-                        );
-
-                        if (res.data && res.data.IpfsHash) {
-                          console.log(
-                            `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`
-                          );
-                          // return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
-                          setTxnHash(res.data.IpfsHash);
-                          alert('create object success');
-                          setIpfsURL(`https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`);
-                        } else {
-                          console.error("Failed to get IPFS link");
-                        }
-                      } catch (error) {
-                        console.error(
-                          "Error uploading glb file:",
-                          error
-                        );
-                      }
-                    }}
-                  >
-                    Upload
+                  <button className="standard-button is-primary m-1 p-2" onClick={handleTuskyUpload} disabled={isUploading}>
+                    {isUploading ? (
+                      <span>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Uploading...
+                      </span>
+                    ) : (
+                      'Upload'
+                    )}
                   </button>
                 </div>
 
-                {/* create object */}
-                <div className="field d-flex justify-content-between">
-                  <button
-                    disabled={txnHash === ''}
-                    className="standard-button is-primary me-1"
-                    onClick={async () => {
-                      if (!address || !info.file || !ipfsURL) return;
-
-                      dispatch({
-                        type: "ADD_OBJECT",
-                        payload: {
-                          link: ipfsURL,
-                          assetIdentifier: info.objectName.concat('_').concat(Date.now().toString()),
-                          assetLink: ipfsURL,
-                          position: new THREE.Vector3(0, 0, 0),
-                          quaternion: new THREE.Quaternion(0, 0, 0, 0),
-                          scale: new THREE.Vector3(1, 1, 1),
-                          worldMatrix: new THREE.Matrix4(),
-                          collision: 'no', // no, yes, box, hull, trimesh (yes=box)
-                          fixed: false // true, false
-                        }
-                      })
-                    }}
-                  >
-                    Add to Scene
-                  </button>
-                  <button
-                    className="standard-button is-primary"
-                    onClick={fetchAssets}
-                  >
-                    My Assets
-                  </button>
+                <div className="field d-flex flex-column">
+                  {objectList.map(asset => (
+                    <div key={asset.id} className="d-flex justify-content-between align-items-center mb-1">
+                      <span>{asset.name}</span>
+                      <button className="standard-button is-primary" onClick={() => handleTuskyDownload(asset.id)}>
+                        Add to Scene
+                      </button>
+                    </div>
+                  ))}
+                  <button className="standard-button is-secondary mt-2" onClick={fetchTuskyAssets}>My Assets</button>
                 </div>
-              </div >
+              </div>
             </div>
           </div>
         </div>
@@ -200,3 +177,5 @@ export const AssetUploadAndFetch = () => {
     </>
   );
 };
+
+export default AssetUploadAndFetch;
