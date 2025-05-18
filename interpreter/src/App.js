@@ -17,8 +17,13 @@ import { useRef } from "react"
 import data from "./test.json"
 import { Scene } from "three"
 import Swal from "sweetalert2"
-import MarketPlace from "./MarketPlace"
+import GameFactoryMarketplace from "./GameFactoryMarketplace"
 
+import { ConnectButton } from "@mysten/dapp-kit"
+import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit"
+import { Transaction } from "@mysten/sui/transactions"
+import { useNetworkVariable } from "./networkConfig.js"
+import { GAME_FACTORY } from "./constants.js"
 
 const networkMap = {
   BOTANIX_TESTNET: {
@@ -28,17 +33,32 @@ const networkMap = {
     rpcUrls: ["https://node.botanixlabs.dev"],
     blockExplorerUrls: ["https://blockscout.botanixlabs.dev/"],
   },
-};
+}
 
 // Controls: WASD + left click
 
-const Model = ({ file, object }) => {
-  // console.log("loading model", object.assetIdentifier)
-  // console.log(object)
-
-  //once the model is loaded, console that it is loaded
-  const gltf = useLoader(GLTFLoader, file, (loader) => {
-    // console.log("loaded model", object.assetIdentifier)
+const Model = async ({ file, object }) => {
+  console.log("Model file: ", file)
+  console.log("Model object: ", object)
+  const VITE_TUSKY_API_KEY = ""
+  const resp = await fetch(file, {
+    headers: { "Api-Key": VITE_TUSKY_API_KEY },
+  })
+  if (!resp.ok) throw new Error("HTTP error " + resp.status)
+  const contentLength = resp.headers.get("Content-Length")
+  const total = contentLength ? parseInt(contentLength, 10) : 0
+  const reader = resp.body.getReader()
+  let received = 0
+  const chunks = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.length
+  }
+  const blob = new Blob(chunks)
+  const gltf = useLoader(GLTFLoader, blob, (loader) => {
+    console.log("loaded model", object.assetIdentifier)
   })
 
   return (
@@ -55,6 +75,8 @@ export default function App() {
   const queryParams = new URLSearchParams(window.location.search)
   const gameAddress = queryParams.get("game") || "loading..."
   const testmode = queryParams.get("testmode") || false
+
+  const client = useSuiClient()
 
   const [account, setAccount] = useState(null)
   const { user, setUser, setText } = useSharedState()
@@ -73,7 +95,7 @@ export default function App() {
     setObjects([])
     setLight([])
     const song = new Audio(world_settings.env_music)
-    song.play()
+    // song.play()
     data.map((object) => {
       if (object.type === "environment") {
         // console.log("setting world settings")
@@ -85,37 +107,12 @@ export default function App() {
         // console.log("setting object", object)
         setObjects((objects) => [...objects, object])
       }
-    }
-    )
-  }
-
-  // gets the user's account and sets the account and user
-  const web3Handler = async () => {
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" })
-    setAccount(accounts[0])
-
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: networkMap.BOTANIX_TESTNET.chainId }],
     })
 
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-    setAccount(accounts[0])
-    setUser(String(accounts[0])) // displaying user address
-
-    const signer = provider.getSigner()
-
-    window.ethereum.on("chainChanged", (chainId) => {
-      window.location.reload()
-    })
-
-    window.ethereum.on("accountsChanged", async function (accounts) {
-      setAccount(accounts[0])
-      setUser(accounts[0])
-      await web3Handler()
-    })
-
-    return signer
+    console.log("World Settings: ", world_settings)
+    console.log("Light: ", light)
+    console.log("Objects: ", objects)
+    setGameReady(true)
   }
 
   // to display "You Won" or "Welcome to the game" when the game starts or ends
@@ -160,40 +157,42 @@ export default function App() {
   }
 
   // load the GameContract
-  const loadContracts = async (signer) => {
+  const loadGame = async () => {
     try {
-      const Gamecontract = new ethers.Contract(gameAddress, GameAbi.abi, signer)
-
-      const greenfield = await Gamecontract.greenfield()
-      // console.log("greenfield json file : ", greenfield)
-
-      // download the json file from the greenfield
-      // data is the local variable that stores the json data
-      // therefore data is not accessible outside this function unless passed as a parameter
-      const response = await fetch(greenfield)
-      const cur_data = await response.json()
-      // console.log(cur_data)
-
-      // populates the environment, light, and objects array with the data from the json file
-
-      // setting [data] state to the json data , can be used after this cycle
-      setData(cur_data)
-
-      // check if player owns the game or not
-      await Gamecontract.getPlayerContract().then((address) => {
-        if (address === "0x0000000000000000000000000000000000000000") {
-          Gamecontract.price().then((price) => {
-            // display the buy screen
-            buy(Gamecontract, price)
-          })
-        } else {
-          // player owns the game : load the player contract
-          const cur_playerContract = new ethers.Contract(address, PlayerStatus.abi, signer)
-          console.log("Player Contract : ", cur_playerContract)
-          setPlayerContract(cur_playerContract) // changed playerContract state
-          menu(true, cur_playerContract, cur_data)
-        }
+      const res = await client.getObject({
+        id: gameAddress,
+        options: { showType: true, showContent: true },
       })
+
+      const fields = res.data.content.fields
+      // get API key from env
+      const VITE_TUSKY_API_KEY = ""
+      const response = await fetch(fields.configuration, {
+        headers: { "Api-Key": VITE_TUSKY_API_KEY },
+      })
+
+      const gameData = await response.json()
+      setData(gameData)
+      load(gameData)
+
+      console.log("Game Data:", gameData)
+      console.log("Game Object:", res, fields)
+
+      // // check if player owns the game or not
+      // await Gamecontract.getPlayerContract().then((address) => {
+      //   if (address === "0x0000000000000000000000000000000000000000") {
+      //     Gamecontract.price().then((price) => {
+      //       // display the buy screen
+      //       buy(Gamecontract, price)
+      //     })
+      //   } else {
+      //     // player owns the game : load the player contract
+      //     const cur_playerContract = new ethers.Contract(address, PlayerStatus.abi, signer)
+      //     console.log("Player Contract : ", cur_playerContract)
+      //     setPlayerContract(cur_playerContract) // changed playerContract state
+      //     menu(true, cur_playerContract, cur_data)
+      //   }
+      // })
     } catch (error) {
       console.error("Error loading contracts:", error)
     }
@@ -214,13 +213,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    web3Handler().then((signer) => {
-      if (testmode) test()
-      else
-        loadContracts(signer).then(() => {
-          setGameReady(true)
-        })
-    })
+    if (testmode) test()
+    else
+      loadGame().then(() => {
+        setGameReady(true)
+      })
   }, [])
 
   useEffect(() => {
@@ -229,7 +226,7 @@ export default function App() {
     }
   }, [data])
 
-  if (gameAddress === "loading...") return <MarketPlace />
+  if (gameAddress === "loading...") return <GameFactoryMarketplace />
   else
     return (
       <>
@@ -263,6 +260,7 @@ export default function App() {
                   {/* <Debug /> */}
                   {objects &&
                     objects.map((object) => {
+                      console.log("Body, object: ", object)
                       if (object.colliders !== "no") {
                         return (
                           <RigidBody
@@ -295,10 +293,14 @@ export default function App() {
                             type={object.fixed ? "fixed" : "dynamic"}
                             colliders={object.colliders}
                             mass={1}>
+                            {console.log("colliders:(2) ", object)}
                             <Model key={object.assetIdentifier} object={object} file={object.assetLink} />
                           </RigidBody>
                         )
                       } else {
+                        {
+                          console.log("colliders: ", object)
+                        }
                         return <Model key={object.assetIdentifier} object={object} file={object.assetLink} />
                       }
                     })}

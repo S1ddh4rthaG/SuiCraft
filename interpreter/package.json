@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@mysten/dapp-kit": "^0.16.2",
+    "@tusky-io/ts-sdk": "^0.30.0",
     "@mysten/sui": "^1.29.1",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
