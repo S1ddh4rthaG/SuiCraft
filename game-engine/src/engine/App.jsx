@@ -535,55 +535,59 @@ function Scene() {
             </div>
             <div className="row m-0 p-0">
               {assetMaster.map((object, index) => {
-                let objectName = object.metadata.name;
+                // Defensive: handle both Pinata and Tusky asset formats
+                let objectName = object.metadata?.name || object.name || object.id || "";
                 let objectNameWithoutTimeStamp = objectName.split("_")[0];
-                if (objectNameWithoutTimeStamp.split(".").pop() !== "glb")
-                  return;
-                let url = `https://gateway.pinata.cloud/ipfs/${object.ipfs_pin_hash}`;
-                if (true)
-                  return (
-                    <div
-                      key={index}
-                      className="col-2 m-0 p-0 card text-light border-0 bg-transparent"
-                    >
-                      <div className="d-flex flex-column card-body bg-dark m-1 rounded-2 shadow-">
-                        <h6 className="card-title">
-                          {objectNameWithoutTimeStamp}
-                        </h6>
-                        <div className="flex-fill"></div>
-                        <div className="d-flex justify-content-between">
-                          <a href={url} className="btn btn-primary">
-                            <span className="bi bi-download"></span>
-                          </a>
-                          <button
-                            className="btn btn-primary"
-                            onClick={(e) => {
-                              navigator.clipboard.writeText(url);
-                              dispatch({
-                                type: "ADD_OBJECT",
-                                payload: {
-                                  link: url,
-                                  assetIdentifier: objectName,
-                                  assetLink: url,
-                                  position: new THREE.Vector3(0, 0, 0),
-                                  quaternion: new THREE.Quaternion(0, 0, 0, 0),
-                                  scale: new THREE.Vector3(1, 1, 1),
-                                  worldMatrix: new THREE.Matrix4(),
-                                  colliders: "no", // no, yes, box, hull, trimesh (yes=box)
-                                  fixed: false, // true, false
-                                  OnClick: "",
-                                  OnHover: "",
-                                  OnCollision: "",
-                                },
-                              });
-                            }}
-                          >
-                            <span className="bi bi-plus"></span>
-                          </button>
-                        </div>
+                // Only show .glb files
+                if (objectNameWithoutTimeStamp.split(".").pop() !== "glb") return;
+                // Pinata asset: has ipfs_pin_hash
+                let url = object.ipfs_pin_hash
+                  ? `https://gateway.pinata.cloud/ipfs/${object.ipfs_pin_hash}`
+                  : object.link || object.assetLink || "";
+                if (!url) return;
+                return (
+                  <div
+                    key={index}
+                    className="col-2 m-0 p-0 card text-light border-0 bg-transparent"
+                  >
+                    <div className="d-flex flex-column card-body bg-dark m-1 rounded-2 shadow-">
+                      <h6 className="card-title">
+                        {objectNameWithoutTimeStamp}
+                      </h6>
+                      <div className="flex-fill"></div>
+                      <div className="d-flex justify-content-between">
+                        <a href={url} className="btn btn-primary">
+                          <span className="bi bi-download"></span>
+                        </a>
+                        <button
+                          className="btn btn-primary"
+                          onClick={(e) => {
+                            navigator.clipboard.writeText(url);
+                            dispatch({
+                              type: "ADD_OBJECT",
+                              payload: {
+                                link: url,
+                                assetIdentifier: objectName,
+                                assetLink: url,
+                                position: new THREE.Vector3(0, 0, 0),
+                                quaternion: new THREE.Quaternion(0, 0, 0, 0),
+                                scale: new THREE.Vector3(1, 1, 1),
+                                worldMatrix: new THREE.Matrix4(),
+                                colliders: "no", // no, yes, box, hull, trimesh (yes=box)
+                                fixed: false, // true, false
+                                OnClick: "",
+                                OnHover: "",
+                                OnCollision: "",
+                              },
+                            });
+                          }}
+                        >
+                          <span className="bi bi-plus"></span>
+                        </button>
                       </div>
                     </div>
-                  );
+                  </div>
+                );
               })}
             </div>
           </div>
