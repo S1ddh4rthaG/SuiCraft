@@ -6,15 +6,10 @@ import {
   Sphere,
 } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import axios from "axios";
 import { useContext, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import * as THREE from "three";
 import { GlobalContext, GlobalContextProvider } from "./GlobalContext.jsx";
-
-import { ethers } from "ethers";
-import GameFactory from "../contracts/GameFactory.json";
-import ContractAddress from "../contracts/contract-address.json";
 
 import WalletAssetDisplay from "../WalletAssetDisplay.tsx";
 import EnvironmentControls from "./EnvironmentControls.jsx";
@@ -26,10 +21,15 @@ import PlayerControls from "./PlayerControls.jsx";
 import TaskControls from "./TaskControls.jsx";
 import objJSON from "./objectMaster.json";
 
+import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { Transaction } from "@mysten/sui/transactions";
+import { useNetworkVariable } from "../networkConfig.ts";
+
 import "./engine.css";
 import logo from "./logo.png";
 
 import { Grid } from "@react-three/drei";
+import { GAME_FACTORY } from "../constants.ts";
 
 export default function App() {
   return (
@@ -40,12 +40,67 @@ export default function App() {
 }
 
 function Scene() {
+  const client = useSuiClient();
+  const suiCraftPackageId = useNetworkVariable("suiCraftPackageId");
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
+
   const [height, setHeight] = useState("30%");
   const [panelClass, setPanelClass] = useState("col-3");
 
   const fileInputRef = useRef(null);
   const { state, dispatch } = useContext(GlobalContext);
   const { objectMaster, currentObjectIdentifer, assetMaster } = state;
+
+  const [showModal, setShowModal] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleAddAsset = async (id) => {
+    setShowModal(true);
+    setProgress(0);
+    try {
+      const resp = await fetch(`https://api.tusky.io/files/${id}/data`, {
+        headers: { "Api-Key": import.meta.env.VITE_TUSKY_API_KEY },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const contentLength = resp.headers.get("Content-Length");
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      const reader = resp.body.getReader();
+      let received = 0;
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total > 0) {
+          setProgress(Math.floor((received / total) * 100));
+        }
+      }
+
+      const blob = new Blob(chunks);
+      const url = URL.createObjectURL(blob);
+      dispatch({
+        type: "ADD_OBJECT",
+        payload: {
+          link: url,
+          assetIdentifier: `${id}_${Date.now()}`,
+          assetLink: `https://api.tusky.io/files/${id}/data`,
+          position: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion(0, 0, 0, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+          worldMatrix: new THREE.Matrix4(),
+          collision: "no",
+          fixed: false,
+        },
+      });
+    } catch (error) {
+      console.error("Tusky download error:", error);
+      alert("Download failed");
+    } finally {
+      setShowModal(false);
+      setProgress(0);
+    }
+  };
 
   // Load Object Master
   const loadScene = (file) => {
@@ -180,9 +235,10 @@ function Scene() {
       const { value: gameName } = await Swal.fire({
         title: "Enter Game Name",
         input: "text",
-        inputLabel: "Game Name",
         inputPlaceholder: "Enter your game name",
         showCancelButton: true,
+        background: "#2b2b2b",
+        color: "#fff",
         inputValidator: (value) => {
           if (!value) {
             return "You need to enter a game name!";
@@ -195,10 +251,11 @@ function Scene() {
       const { value: gamePrice } = await Swal.fire({
         title: "Enter Game Price",
         input: "number",
-        inputLabel: "Game Price",
         inputPlaceholder: "Enter the price of your game",
         inputAttributes: { min: 0 },
         showCancelButton: true,
+        background: "#2b2b2b",
+        color: "#fff",
         inputValidator: (value) => {
           if (!value) {
             return "You need to enter a game price!";
@@ -214,6 +271,8 @@ function Scene() {
         inputLabel: "Game Thumbnail",
         inputPlaceholder: "Enter the thumbnail link of your game",
         showCancelButton: true,
+        background: "#2b2b2b",
+        color: "#fff",
         inputValidator: (value) => {
           if (!value) {
             return "You need to enter a game thumbnail!";
@@ -224,12 +283,17 @@ function Scene() {
       if (!gameThumbnail) return;
 
       // Upload scene JSON to Tusky
-      const tusky = new (await import('@tusky-io/ts-sdk/web')).Tusky({ apiKey: import.meta.env.VITE_TUSKY_API_KEY });
-      const vaultName = 'sui-craft-vault';
+      const tusky = new (await import("@tusky-io/ts-sdk/web")).Tusky({
+        apiKey: import.meta.env.VITE_TUSKY_API_KEY,
+      });
+      const vaultName = "sui-craft-vault";
       let vaults = await tusky.vault.listAll();
-      let vault = vaults.find(v => v.name === vaultName);
-      if (!vault) vault = await tusky.vault.create(vaultName, { encrypted: false });
-      const sceneBlob = new Blob([JSON.stringify(objectMaster)], { type: 'application/json' });
+      let vault = vaults.find((v) => v.name === vaultName);
+      if (!vault)
+        vault = await tusky.vault.create(vaultName, { encrypted: false });
+      const sceneBlob = new Blob([JSON.stringify(objectMaster)], {
+        type: "application/json",
+      });
       const tuskyFileId = await tusky.file.upload(vault.id, sceneBlob);
       const tuskySceneUrl = `https://api.tusky.io/files/${tuskyFileId}/data`;
 
@@ -238,24 +302,56 @@ function Scene() {
       let taskNames = tasks.map((task) => task.assetIdentifier);
       console.log("taskNames:", taskNames);
 
-      // @Siddhartha: Call Sui contract 
-      
-      // const client = useSuiClient();
-      // await client.callMoveFunction({ ... });
-      // For now, I'm showing a success dialog with the Tusky URL
-      Swal.fire({
-        title: "Game Published!",
-        html: `<div>Scene uploaded to Tusky:<br/><a href='${tuskySceneUrl}' target='_blank'>${tuskySceneUrl}</a></div>` +
-          `<div class='mt-2'>Game Name: <b>${gameName}</b><br/>Price: <b>${gamePrice}</b><br/>Thumbnail: <b>${gameThumbnail}</b></div>`,
-        icon: "success",
-        confirmButtonText: "OK",
+      const tx = new Transaction();
+
+      tx.moveCall({
+        arguments: [
+          tx.object(GAME_FACTORY),
+          tx.pure.string(gameName),
+          tx.pure.string(gameThumbnail),
+          tx.pure.u64(gamePrice),
+          tx.pure.string(tuskySceneUrl),
+          tx.pure.vector("string", taskNames),
+        ],
+        target: `${suiCraftPackageId}::game::new_game`,
       });
+
+      console.log("Transaction: ", tx);
+
+      signAndExecute(
+        {
+          transaction: tx,
+        },
+        {
+          onSuccess: async ({ digest }) => {
+            const { effects } = await client.waitForTransaction({
+              digest: digest,
+              options: {
+                showEffects: true,
+              },
+            });
+
+            Swal.fire({
+              title: "Game Published!",
+              html:
+                `<div>Scene uploaded to Tusky:<br/><a href='${tuskySceneUrl}' target='_blank'>${tuskySceneUrl}</a></div>` +
+                `<div class='mt-2'>Game Name: <b>${gameName}</b><br/>Price: <b>${gamePrice}</b><br/>Thumbnail: <b>${gameThumbnail}</b></div>`,
+              icon: "success",
+              confirmButtonText: "OK",
+              background: "#2b2b2b",
+              color: "#fff",
+            });
+          },
+        }
+      );
     } catch (error) {
       console.error("Error in publishGame:", error);
       Swal.fire({
         title: "Error",
         text: error.message || "Failed to publish game.",
         icon: "error",
+        background: "#2b2b2b",
+        color: "#fff",
       });
     }
   };
@@ -345,7 +441,6 @@ function Scene() {
               </div>
             </div>
           </div>
-
 
           {/* Scene */}
           <div style={{ height: height === "30%" ? "70%" : "100%" }}>
@@ -453,15 +548,20 @@ function Scene() {
             </div>
             <div className="row m-0 p-0">
               {assetMaster.map((object, index) => {
-                
-                let objectName = object.metadata?.name || object.name || object.id || "";
+                let objectName =
+                  object.metadata?.name || object.name || object.id || "";
                 let objectNameWithoutTimeStamp = objectName.split("_")[0];
                 // Only show .glb files
-                if (objectNameWithoutTimeStamp.split(".").pop() !== "glb") return;
-                
+                if (objectNameWithoutTimeStamp.split(".").pop() !== "glb")
+                  return;
+
                 let url = object.ipfs_pin_hash
                   ? `https://gateway.pinata.cloud/ipfs/${object.ipfs_pin_hash}`
-                  : object.link || object.assetLink || (object.id ? `https://api.tusky.io/files/${object.id}/data` : "");
+                  : object.link ||
+                    object.assetLink ||
+                    (object.id
+                      ? `https://api.tusky.io/files/${object.id}/data`
+                      : "");
                 if (!url) return;
                 return (
                   <div
@@ -481,23 +581,7 @@ function Scene() {
                           className="btn btn-primary"
                           onClick={() => {
                             navigator.clipboard.writeText(url);
-                            dispatch({
-                              type: "ADD_OBJECT",
-                              payload: {
-                                link: url,
-                                assetIdentifier: objectName,
-                                assetLink: url,
-                                position: new THREE.Vector3(0, 0, 0),
-                                quaternion: new THREE.Quaternion(0, 0, 0, 0),
-                                scale: new THREE.Vector3(1, 1, 1),
-                                worldMatrix: new THREE.Matrix4(),
-                                colliders: "no", // no, yes, box, hull, trimesh (yes=box)
-                                fixed: false, // true, false
-                                OnClick: "",
-                                OnHover: "",
-                                OnCollision: "",
-                              },
-                            });
+                            handleAddAsset(object.id);
                           }}
                         >
                           <span className="bi bi-plus"></span>
@@ -510,7 +594,6 @@ function Scene() {
             </div>
           </div>
         </div>
-
 
         {/* Side Panel */}
         <div
@@ -539,6 +622,33 @@ function Scene() {
             </div>
           </div>
         </div>
+
+        {/* Progress Modal */}
+        {showModal && (
+          <div className="modal show d-block" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content standard-background">
+                <div className="modal-header standard-background border-0">
+                  <h5 className="modal-title">Downloading asset</h5>
+                </div>
+                <div className="modal-body">
+                  <div className="progress">
+                    <div
+                      className="progress-bar"
+                      role="progressbar"
+                      style={{ width: `${progress}%` }}
+                      aria-valuenow={progress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      {progress}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
