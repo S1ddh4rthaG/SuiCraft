@@ -3,7 +3,7 @@ import {
   DEVNET_PACKAGE_ID,
   TESTNET_PACKAGE_ID,
   MAINNET_PACKAGE_ID,
-} from "./constants.ts";
+} from "./constants.js";
 import { createNetworkConfig } from "@mysten/dapp-kit";
 
 const { networkConfig, useNetworkVariable, useNetworkVariables } =

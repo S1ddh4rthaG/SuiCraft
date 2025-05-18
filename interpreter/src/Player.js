@@ -6,7 +6,6 @@ import { useKeyboardControls  } from "@react-three/drei"
 import { CapsuleCollider , RigidBody, useRapier } from "@react-three/rapier"
 
 
-
 const direction = new THREE.Vector3()
 const frontVector = new THREE.Vector3()
 const sideVector = new THREE.Vector3()
