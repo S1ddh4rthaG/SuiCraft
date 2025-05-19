@@ -136,8 +136,10 @@ export const AssetUploadAndFetch = () => {
       console.log("Tusky vault:", vault);
       if (!vault) return;
       const files = await tusky.file.list(vault.id);
-      console.log("Tusky files:", files);
-      const assets = files.items.map((f) => ({
+      // take only those files whose vaultId matches with that of vaultName and name contains .glb
+      const files2 = files.items.filter((f) => f.vaultId === vault.id && f.name && f.name.includes('.glb'));
+      console.log("Tusky files2:", files2);
+      const assets = files2.map((f) => ({
         id: f.id,
         name: f.name || f.id,
       }));
