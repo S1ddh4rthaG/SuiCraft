@@ -189,10 +189,43 @@ export default function App() {
           },
         )
       }
-      const resPlayersv2 = await client.getDynamicFields({ parentId: playersTableID })
-      console.log("resPlayersv2:", resPlayers)
-      const playerGameObjID = resPlayersv2.data.find((p) => p.name.value === currentAccount.address).objectId
-      console.log("playerGameObjID:", playerGameObjID)
+      
+      // After purchase, poll for your player object to appear, allow user to cancel
+      let playerEntry = null;
+      let cancelled = false;
+      await new Promise(async (resolve) => {
+        const modal = Swal.fire({
+          title: "Finalizing Purchase",
+          html: "Waiting for your access to be granted on-chain...<br/><br/><button id='cancelWait' class='swal2-cancel swal2-styled'>Cancel</button>",
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            document.getElementById('cancelWait').onclick = () => {
+              cancelled = true;
+              Swal.close();
+              resolve();
+            };
+          },
+          showConfirmButton: false,
+        });
+        while (!playerEntry && !cancelled) {
+          const resPlayersv2 = await client.getDynamicFields({ parentId: playersTableID });
+          playerEntry = resPlayersv2.data.find((p) => p.name.value === currentAccount.address);
+          if (playerEntry) break;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        Swal.close();
+        resolve();
+      });
+      if (!playerEntry) {
+        throw new Error("Player object not found after purchase. Please try again in a few seconds.");
+      }
+      const playerGameObjID = playerEntry.objectId;
+
+      // const resPlayersv2 = await client.getDynamicFields({ parentId: playersTableID })
+      // console.log("resPlayersv2:", resPlayers)
+      // const playerGameObjID = resPlayersv2.data.find((p) => p.name.value === currentAccount.address).objectId
+      // console.log("playerGameObjID:", playerGameObjID)
       const playerDynamicObj = await client.getObject({
         id: playerGameObjID,
         options: { showContent: true },
