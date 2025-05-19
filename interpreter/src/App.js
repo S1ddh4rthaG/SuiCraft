@@ -272,7 +272,12 @@ export default function App() {
   }, [currentAccount])
 
   if (!gameAddress) {
-    return <GameFactoryMarketplace />
+    // Make the marketplace scrollable if there are many games
+    return (
+      <div style={{ height: "100vh", overflowY: "auto" }}>
+        <GameFactoryMarketplace />
+      </div>
+    );
   }
 
   if (!gameReady || !worldSettings) {
