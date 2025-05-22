@@ -17,7 +17,7 @@ import { Transaction } from "@mysten/sui/transactions"
 import { useNetworkVariable } from "./networkConfig.js"
 import { GAME_FACTORY } from "./constants.js"
 
-const VITE_TUSKY_API_KEY = "5902acd4-38ee-410a-a23e-1674d025bec5"
+const VITE_TUSKY_API_KEY = "your_api_key_here"
 
 // Custom hook to fetch & parse GLTF from a remote URL
 function useGLTFFromUrl(url) {
