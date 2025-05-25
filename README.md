@@ -35,7 +35,6 @@
 | Smart Contract  | All gaming logic handled by Move contracts                         | Sui Move |
 | Walrus Storage         | Tusky-powered IPFS storage with automatic metadata linking                   | Tusky Protocol         |
 | Live Preview           | Test games in real-time with built-in Sui Testnet faucet                   | Vite, Sui DevNet       |
-| Marketplace Integration| One-click NFT minting and secondary market listings                        | Sui Kiosk              |
 
 
 ---
